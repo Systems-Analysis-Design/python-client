@@ -1,2 +1,2 @@
-sseclient~=0.0.27
-urllib3~=1.26.12
+sseclient-py=1.8.0
+urllib3=2.0.4

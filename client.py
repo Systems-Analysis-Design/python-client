@@ -24,7 +24,7 @@ class Client:
         if response.status != 200:
             raise Exception("error in calling pull function", response.msg)
         data = json.loads(response.data.decode())
-        return data['key'], bytes(data['value'], encoding="UTF-8")
+        return data['key'], bytes(data['value'], encoding="UTF-8") if data['value'] is not None else None
 
     def _request_generator(self):
         return self.connection.request("GET",
@@ -60,39 +60,3 @@ class Client:
     def close(self):
         self.subscribe_client.close()
         self.connection.clear()
-
-
-def client1_print(key, value):
-    print(f'client 1, key: {key}, value: {value}')
-
-
-def client2_print(key, value):
-    print(f'client 2, key: {key}, value: {value}')
-
-
-client1 = Client("http://localhost:8080")
-# client2 = Client("http://localhost:8080")
-client1.push("1", bytes("message", encoding="UTF-8"))
-client1.push("2", bytes("message", encoding="UTF-8"))
-client1.push("3", bytes("message", encoding="UTF-8"))
-client1.push("4", bytes("message", encoding="UTF-8"))
-client1.push("5", bytes("message", encoding="UTF-8"))
-client1.push("6", bytes("message", encoding="UTF-8"))
-client1.push("7", bytes("message", encoding="UTF-8"))
-client1.push("8", bytes("message", encoding="UTF-8"))
-client1.push("9", bytes("message", encoding="UTF-8"))
-client1.push("10", bytes("message", encoding="UTF-8"))
-print(client1.pull())
-print(client1.pull())
-print(client1.pull())
-print(client1.pull())
-print(client1.pull())
-print(client1.pull())
-print(client1.pull())
-print(client1.pull())
-print(client1.pull())
-print(client1.pull())
-# client1.subscribe(client1_print)
-# client2.subscribe(client2_print)
-# client1.close()
-# client2.close()
