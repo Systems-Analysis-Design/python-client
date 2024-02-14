@@ -1,62 +1,59 @@
 import json
-from sseclient import SSEClient
-from urllib3 import PoolManager, Timeout
-from threading import Thread
+from urllib3 import PoolManager
 
 
 class Client:
     def __init__(self, address: str):
         self.address = address
         self.connection = PoolManager()
-        self.subscribe_functions = []
-        self.subscribe_client = None
-        self.thread = None
+        self.subscribers = []
 
     def push(self, key: str, value: bytes):
         headers = {'Content-type': 'application/json'}
         data = {'key': key, 'value': value.decode()}
         response = self.connection.request("POST", self.address + "/push", body=json.dumps(data), headers=headers)
         if response.status != 200:
-            raise Exception("error in calling push function", response.msg)
+            raise Exception("error in calling push function")
+        self._notify_subscribers()
 
     def pull(self) -> (str, bytes):
         response = self.connection.request("GET", self.address + "/pull")
         if response.status != 200:
-            raise Exception("error in calling pull function", response.msg)
+            raise Exception("error in calling pull function")
         data = json.loads(response.data.decode())
         return data['key'], bytes(data['value'], encoding="UTF-8") if data['value'] is not None else None
 
-    def _request_generator(self):
-        return self.connection.request("GET",
-                                       self.address + "/subscribe",
-                                       preload_content=False,
-                                       headers={'Accept': 'text/event-stream'})
-
-    def _init_subscribe(self):
-        if self.subscribe_client is None:
-            self.subscribe_client = SSEClient(self._request_generator())
-
-    def _call_subscribe_functions(self, key: str, value: bytes):
-        for f in self.subscribe_functions:
-            f(key, value)
-
-    def _wait_for_events(self):
-        try:
-            for event in self.subscribe_client.events():
-                json_data = json.loads(event.data)
-                key = json_data['key']
-                value = json_data['value']
-                self._call_subscribe_functions(key, value)
-        except:
-            return
+    def _notify_subscribers(self):
+        if len(self.subscribers) != 0:
+            f = self.subscribers.pop(0)
+            key, value = self.pull()
+            if value is not None:
+                f(key, value)
+            self.subscribers.append(f)
 
     def subscribe(self, f):
-        self._init_subscribe()
-        self.subscribe_functions.append(f)
-        if self.thread is None:
-            self.thread = Thread(target=self._wait_for_events)
-            self.thread.start()
+        self.subscribers.append(f)
 
     def close(self):
-        self.subscribe_client.close()
         self.connection.clear()
+        self.subscribers.clear()
+
+
+SERVER_ADDRESS = "http://localhost:8080"
+client = Client(SERVER_ADDRESS)
+
+
+def push(key: str, value: bytes):
+    client.push(key, value)
+
+
+def pull() -> (str, bytes):
+    return client.pull()
+
+
+def subscribe(action):
+    client.subscribe(action)
+
+
+def close():
+    client.close()
